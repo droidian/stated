@@ -1,0 +1,15 @@
+[Unit]
+Description=Device state management daemon
+# FIXME: This hard dependency should be removed once compositor state signalling
+# is implemented
+Requires=phosh.service
+After=phosh.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/stated
+Restart=on-failure
+
+[Install]
+# FIXME: Like above, this should really be on multi-user.target at least
+WantedBy=graphical.target
