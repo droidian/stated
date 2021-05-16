@@ -36,5 +36,8 @@
 
 void wakelock_lock (char* lock_name);
 void wakelock_unlock (char* lock_name);
+void wakelock_timed (char* lock_name, uint timeout);
+void wakelock_cancel (char* lock_name, gboolean keep_lock);
+void wakelock_cancel_all (void);
 
 #endif /* STATEDWAKELOCKS_H */
