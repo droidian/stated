@@ -30,6 +30,7 @@
 #include <glib-2.0/glib.h>
 #include <stdlib.h>
 
+#include "wakelocks.h"
 #include "sleep.h"
 #include "devicestate.h"
 #include "stated-config.h"
@@ -82,6 +83,7 @@ main (int   argc,
 
   /* Cleanup */
   autosleep_disable ();
+  wakelock_cancel_all ();
   g_clear_object (&devicestate);
 
   return EXIT_SUCCESS;

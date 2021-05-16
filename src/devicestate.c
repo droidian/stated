@@ -46,24 +46,9 @@ struct _StatedDevicestate
   StatedDisplay *primary_display;
   StatedInput *powerkey_input;
   gboolean primary_display_on;
-
-  uint display_timeout_source;
-  uint powerkey_timeout_source;
 };
 
 G_DEFINE_TYPE (StatedDevicestate, stated_devicestate, G_TYPE_OBJECT)
-
-static gboolean
-on_display_timeout_elapsed (StatedDevicestate *self)
-{
-  g_return_val_if_fail (STATED_IS_DEVICESTATE (self), G_SOURCE_REMOVE);
-
-  /* Remove the wakelock */
-  wakelock_unlock (DISPLAY_WAKELOCK);
-  self->display_timeout_source = 0;
-
-  return G_SOURCE_REMOVE;
-}
 
 static void
 on_display_status_changed (StatedDevicestate *self,
@@ -78,39 +63,19 @@ on_display_status_changed (StatedDevicestate *self,
   g_value_init (&value, pspec->value_type);
   g_object_get_property (G_OBJECT (display), pspec->name, &value);
 
-  /* Cancel/rearm an eventual timer */
-  if (self->display_timeout_source > 0) {
-    /* Another timeout has been set */
-    g_debug ("Cancel/rearm display timeout source...");
-    g_source_remove (self->display_timeout_source);
-    self->display_timeout_source = 0;
-  }
-
   if (g_value_get_boolean (&value) == TRUE) {
     g_debug ("Display on, setting wakelock");
     wakelock_lock (DISPLAY_WAKELOCK);
+
+    /* Cancel an eventual timeout triggered by a previous display shutdown */
+    wakelock_cancel (DISPLAY_WAKELOCK, TRUE);
   } else {
     g_debug ("Display off, scheduling wakelock removal");
 
-    self->display_timeout_source =
-      g_timeout_add_seconds (DEFAULT_WAIT_TIME,
-                             G_SOURCE_FUNC (on_display_timeout_elapsed),
-                             self);
+    wakelock_timed (DISPLAY_WAKELOCK, DEFAULT_WAIT_TIME);
   }
 
   g_value_unset (&value);
-}
-
-static gboolean
-on_powerkey_timeout_elapsed (StatedDevicestate *self)
-{
-  g_return_val_if_fail (STATED_IS_DEVICESTATE (self), G_SOURCE_REMOVE);
-
-  /* Remove the wakelock */
-  wakelock_unlock (POWERKEY_WAKELOCK);
-  self->powerkey_timeout_source = 0;
-
-  return G_SOURCE_REMOVE;
 }
 
 static void
@@ -120,20 +85,8 @@ on_powerkey_pressed (StatedDevicestate *self,
   g_return_if_fail (STATED_IS_DEVICESTATE (self));
   g_return_if_fail (STATED_IS_INPUT (input));
 
-  if (self->powerkey_timeout_source > 0) {
-    /* Another timeout has been set */
-    g_debug ("Rearming powerkey timeout source...");
-    g_source_remove (self->powerkey_timeout_source);
-  }
-
-  /* Acquire a wakelock */
-  wakelock_lock (POWERKEY_WAKELOCK);
-
   /* Add a timeout to remove the wakelock */
-  self->powerkey_timeout_source =
-    g_timeout_add_seconds (DEFAULT_WAIT_TIME,
-                           G_SOURCE_FUNC (on_powerkey_timeout_elapsed),
-                           self);
+  wakelock_timed (POWERKEY_WAKELOCK, DEFAULT_WAIT_TIME);
 }
 
 static void
