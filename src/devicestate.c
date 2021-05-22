@@ -31,12 +31,20 @@
 
 #define DISPLAY_WAKELOCK "stated_display"
 #define POWERKEY_WAKELOCK "stated_powerkey_timer"
+#define RESUME_WAKELOCK "stated_resume_timer"
 #define DEFAULT_WAIT_TIME 10
+
+/* Resume behaviour */
+#define RESUME_LOCK_WAIT_TIME 2
+#define RESUME_MAX_CEILING 7
 
 #include "wakelocks.h"
 #include "devicestate.h"
 #include "display.h"
 #include "input.h"
+#include "sleeptracker.h"
+
+static uint64_t RESUME_LOOP_THRESHOLD = (uint64_t)15000; /* 15 secs */
 
 struct _StatedDevicestate
 {
@@ -45,7 +53,10 @@ struct _StatedDevicestate
   /* instance members */
   StatedDisplay *primary_display;
   StatedInput *powerkey_input;
+  StatedSleeptracker *sleep_tracker;
   gboolean primary_display_on;
+
+  uint8_t subsequent_resumes;
 };
 
 G_DEFINE_TYPE (StatedDevicestate, stated_devicestate, G_TYPE_OBJECT)
@@ -90,6 +101,58 @@ on_powerkey_pressed (StatedDevicestate *self,
 }
 
 static void
+on_resume (StatedDevicestate  *self,
+           uint64_t           previous_boottime,
+           uint64_t           new_boottime,
+           StatedSleeptracker *sleep_tracker)
+{
+  uint64_t time_offset;
+
+  g_return_if_fail (STATED_IS_DEVICESTATE (self));
+  g_return_if_fail (STATED_IS_SLEEPTRACKER (sleep_tracker));
+
+  /* Always obtain a wakelock for RESUME_WAKELOCK */
+  wakelock_lock (RESUME_WAKELOCK);
+
+  /* Try to detect subsequent sleep/resume loops and damper them,
+   * the logic is as follows:
+   *
+   * - Always obtain a timed wakelock, using subsequent_resumes * RESUME_LOCK_WAIT_TIME
+   * - If a "sleep/resume loop" is detected, increment subsequent_resumes so that
+   *   the device spends more time awake. The ceiling is RESUME_MAX_CEILING (7),
+   *   so that means that the timed wakelock will last at most for 14 seconds.
+   */
+
+  /* StatedSleeptracker only tracks resumes for now, so we're unable to precisely
+   * get the time of sleep. Calculate a time offset with what has been possibly
+   * been the previous wakelock timeout and use it to augment the supplied
+   * previous_boottime.
+   *
+   * TODO: once StatedSleeptracker supports tracking sleep entries, remove
+   * this.
+   */
+  time_offset = (self->subsequent_resumes == 0) ? 0
+                : RESUME_LOCK_WAIT_TIME * (self->subsequent_resumes + 1) * 1000;
+
+  g_debug ("now - previous_bootime: %lu", (new_boottime - previous_boottime + time_offset));
+
+  if ((new_boottime - previous_boottime + time_offset) < RESUME_LOOP_THRESHOLD) {
+    /* Assume this is a sleep/resume loop. */
+    self->subsequent_resumes = MIN (self->subsequent_resumes + 1,
+                                    RESUME_MAX_CEILING);
+    g_warning ("Resume loop detected, subsequent_resumes raised to %d",
+             self->subsequent_resumes);
+  } else {
+    /* Clear counter */
+    self->subsequent_resumes = 1;
+  }
+
+  /* Add a timer for the lock we previously obtained */
+  wakelock_timed (RESUME_WAKELOCK,
+                  RESUME_LOCK_WAIT_TIME * self->subsequent_resumes);
+}
+
+static void
 stated_devicestate_constructed (GObject *obj)
 {
   StatedDevicestate *self = STATED_DEVICESTATE (obj);
@@ -100,12 +163,19 @@ stated_devicestate_constructed (GObject *obj)
 
   self->powerkey_input = stated_input_new_for_key (KEY_POWER);
 
+  self->sleep_tracker = stated_sleeptracker_new ();
+  self->subsequent_resumes = 1;
+
   g_signal_connect_object (self->primary_display, "notify::on",
                            G_CALLBACK (on_display_status_changed),
                            self, G_CONNECT_SWAPPED);
 
   g_signal_connect_object (self->powerkey_input, "powerkey-pressed",
                            G_CALLBACK (on_powerkey_pressed),
+                           self, G_CONNECT_SWAPPED);
+
+  g_signal_connect_object (self->sleep_tracker, "resume",
+                           G_CALLBACK (on_resume),
                            self, G_CONNECT_SWAPPED);
 }
 
@@ -116,6 +186,7 @@ stated_devicestate_dispose (GObject *obj)
 
   g_clear_object (&self->primary_display);
   g_clear_object (&self->powerkey_input);
+  g_clear_object (&self->sleep_tracker);
 
   G_OBJECT_CLASS (stated_devicestate_parent_class)->dispose (obj);
 }
