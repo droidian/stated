@@ -32,8 +32,12 @@
 
 #include <unistd.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <time.h>
 #include <glib-2.0/glib.h>
 
 int sysfs_write (char *content, char *sysfs_file);
+uint64_t time_get_monotonic (void);
+uint64_t time_get_boottime (void);
 
 #endif /* STATEDUTILS_H */

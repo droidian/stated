@@ -54,3 +54,30 @@ sysfs_write (char *content, char *sysfs_file)
   return 0;
 }
 
+static uint64_t
+time_get_current (uint8_t clk)
+{
+  struct timespec tspec;
+
+  clock_gettime (clk, &tspec);
+
+  return (uint64_t)tspec.tv_sec * 1000 + tspec.tv_nsec / 1000000;
+}
+
+/**
+ * Helper function that gets the current monotonic time, in milliseconds.
+ */
+uint64_t
+time_get_monotonic (void)
+{
+  return time_get_current (CLOCK_MONOTONIC);
+}
+
+/**
+ * Helper function that gets the current boottime, in milliseconds.
+ */
+uint64_t
+time_get_boottime (void)
+{
+  return time_get_current (CLOCK_BOOTTIME);
+}
