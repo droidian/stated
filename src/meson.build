@@ -6,6 +6,7 @@ stated_sources = [
   'display.c',
   'input.c',
   'sleep.c',
+  'sleeptracker.c',
 ]
 
 stated_deps = [
