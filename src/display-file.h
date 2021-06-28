@@ -1,4 +1,4 @@
-/* display.c
+/* main.c
  *
  * Copyright 2021 Eugenio Paolantonio (g7)
  *
@@ -27,19 +27,21 @@
  * authorization.
  */
 
-#define G_LOG_DOMAIN "stated-display"
+#ifndef STATEDDISPLAYFILE_H
+#define STATEDDISPLAYFILE_H
 
-#include "display.h"
+#include <glib-2.0/glib.h>
+#include <glib-2.0/glib-object.h>
+#include <glib-2.0/gio/gio.h>
 
-G_DEFINE_INTERFACE (StatedDisplay, stated_display, G_TYPE_OBJECT)
+G_BEGIN_DECLS
 
-static void
-stated_display_default_init (StatedDisplayInterface *iface)
-{
-  g_object_interface_install_property (iface,
-                                       g_param_spec_boolean ("on",
-                                                             "on",
-                                                             "Whether the display is on or off",
-                                                             TRUE,
-                                                             G_PARAM_READABLE));
-}
+#define STATED_TYPE_DISPLAY_FILE stated_display_file_get_type ()
+G_DECLARE_FINAL_TYPE (StatedDisplayFile, stated_display_file, STATED, DISPLAY_FILE, GObject)
+
+StatedDisplayFile *stated_display_file_new (void);
+gboolean stated_display_file_check (void);
+
+G_END_DECLS
+
+#endif /* STATEDDISPLAYFILE_H */

@@ -4,6 +4,7 @@ stated_sources = [
   'wakelocks.c',
   'devicestate.c',
   'display.c',
+  'display-file.c',
   'input.c',
   'sleep.c',
   'sleeptracker.c',

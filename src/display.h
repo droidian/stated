@@ -1,4 +1,4 @@
-/* main.c
+/* display.h
  *
  * Copyright 2021 Eugenio Paolantonio (g7)
  *
@@ -32,14 +32,16 @@
 
 #include <glib-2.0/glib.h>
 #include <glib-2.0/glib-object.h>
-#include <glib-2.0/gio/gio.h>
 
 G_BEGIN_DECLS
 
 #define STATED_TYPE_DISPLAY stated_display_get_type ()
-G_DECLARE_FINAL_TYPE (StatedDisplay, stated_display, STATED, DISPLAY, GObject)
+G_DECLARE_INTERFACE (StatedDisplay, stated_display, STATED, DISPLAY, GObject)
 
-StatedDisplay *stated_display_new (void);
+struct _StatedDisplayInterface
+{
+  GTypeInterface parent_iface;
+};
 
 G_END_DECLS
 

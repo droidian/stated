@@ -41,6 +41,7 @@
 #include "wakelocks.h"
 #include "devicestate.h"
 #include "display.h"
+#include "display-file.h"
 #include "input.h"
 #include "sleeptracker.h"
 
@@ -159,16 +160,20 @@ stated_devicestate_constructed (GObject *obj)
 
   G_OBJECT_CLASS (stated_devicestate_parent_class)->constructed (obj);
 
-  self->primary_display = stated_display_new ();
+  if (stated_display_file_check ())
+    self->primary_display = stated_display_file_new ();
+  else
+    self->primary_display = NULL;
 
   self->powerkey_input = stated_input_new_for_key (KEY_POWER);
 
   self->sleep_tracker = stated_sleeptracker_new ();
   self->subsequent_resumes = 1;
 
-  g_signal_connect_object (self->primary_display, "notify::on",
-                           G_CALLBACK (on_display_status_changed),
-                           self, G_CONNECT_SWAPPED);
+  if (self->primary_display)
+    g_signal_connect_object (self->primary_display, "notify::on",
+                             G_CALLBACK (on_display_status_changed),
+                             self, G_CONNECT_SWAPPED);
 
   g_signal_connect_object (self->powerkey_input, "powerkey-pressed",
                            G_CALLBACK (on_powerkey_pressed),
@@ -184,7 +189,8 @@ stated_devicestate_dispose (GObject *obj)
 {
   StatedDevicestate *self = STATED_DEVICESTATE (obj);
 
-  g_clear_object (&self->primary_display);
+  if (self->primary_display)
+    g_clear_object (&self->primary_display);
   g_clear_object (&self->powerkey_input);
   g_clear_object (&self->sleep_tracker);
 
