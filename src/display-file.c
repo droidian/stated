@@ -32,7 +32,7 @@
 #include "display.h"
 #include "display-file.h"
 
-static const char qcom_display_state_file[] = "/sys/class/graphics/fb0/show_blank_event"; /* FIXME: support other displays */
+static const char qcom_display_state_file[] = "/sys/class/drm/card0-DSI-1/enabled"; /* FIXME: support other displays */
 /* TODO: allow detecting screen status on other devices / allow feeding state from compositor */
 
 struct _StatedDisplayFile
@@ -76,7 +76,7 @@ on_qcom_display_state_changed (GFileMonitor      *monitor,
                              &file_contents, NULL, NULL))
       goto end;
 
-    if (g_strcmp0 (file_contents, "panel_power_on = 1\n") == 0) {
+    if (g_strcmp0 (file_contents, "enabled\n") == 0) {
       g_debug ("qcom display powered on!");
       self->on = TRUE;
     } else {
@@ -224,4 +224,21 @@ stated_display_file_check (void)
   }
 
   return FALSE;
+}
+
+gboolean
+qcom_display_is_on() {
+  char *file_contents = NULL;
+
+  if (!g_file_get_contents (qcom_display_state_file, /* FIXME: read from GFile instead */
+                             &file_contents, NULL, NULL))
+      return FALSE;
+
+    if (g_strcmp0 (file_contents, "enabled\n") == 0) {
+      g_debug ("qcom display powered on!");
+      return TRUE;
+    }
+
+    g_debug ("qcom display powered off!");
+    return FALSE;
 }

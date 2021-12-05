@@ -41,6 +41,7 @@ G_DECLARE_FINAL_TYPE (StatedDisplayFile, stated_display_file, STATED, DISPLAY_FI
 
 StatedDisplayFile *stated_display_file_new (void);
 gboolean stated_display_file_check (void);
+gboolean qcom_display_is_on(void);
 
 G_END_DECLS
 

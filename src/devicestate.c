@@ -52,7 +52,7 @@ struct _StatedDevicestate
   GObject parent_instance;
 
   /* instance members */
-  StatedDisplay *primary_display;
+  StatedDisplayFile *primary_display;
   StatedInput *powerkey_input;
   StatedSleeptracker *sleep_tracker;
   gboolean primary_display_on;
@@ -63,14 +63,29 @@ struct _StatedDevicestate
 G_DEFINE_TYPE (StatedDevicestate, stated_devicestate, G_TYPE_OBJECT)
 
 static void
+on_display_register_wakelock(gboolean on) {
+  if (on) {
+    g_debug ("Display on, setting wakelock");
+    wakelock_lock (DISPLAY_WAKELOCK);
+
+    /* Cancel an eventual timeout triggered by a previous display shutdown */
+    wakelock_cancel (DISPLAY_WAKELOCK, TRUE);
+  } else {
+    g_debug ("Display off, scheduling wakelock removal");
+
+    wakelock_timed (DISPLAY_WAKELOCK, DEFAULT_WAIT_TIME);
+  }
+}
+
+static void
 on_display_status_changed (StatedDevicestate *self,
                            GParamSpec    *pspec,
-                           StatedDisplay *display)
+                           StatedDisplayFile *display)
 {
   GValue value = G_VALUE_INIT;
 
   g_return_if_fail (STATED_IS_DEVICESTATE (self));
-  g_return_if_fail (STATED_IS_DISPLAY (display));
+  g_return_if_fail (STATED_IS_DISPLAY_FILE (display));
 
   g_value_init (&value, pspec->value_type);
   g_object_get_property (G_OBJECT (display), pspec->name, &value);
@@ -90,6 +105,14 @@ on_display_status_changed (StatedDevicestate *self,
   g_value_unset (&value);
 }
 
+static gboolean
+delayed_display_lock()
+{
+  on_display_register_wakelock(qcom_display_is_on());
+
+  return FALSE;
+}
+
 static void
 on_powerkey_pressed (StatedDevicestate *self,
                      StatedInput      *input)
@@ -99,6 +122,9 @@ on_powerkey_pressed (StatedDevicestate *self,
 
   /* Add a timeout to remove the wakelock */
   wakelock_timed (POWERKEY_WAKELOCK, DEFAULT_WAIT_TIME);
+
+
+  g_timeout_add_seconds(1, delayed_display_lock, NULL);
 }
 
 static void
